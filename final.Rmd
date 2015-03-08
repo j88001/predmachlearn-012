@@ -1,0 +1,108 @@
+---
+title: "Practical Machine Learning - Final Project"
+output: html_document
+---
+
+This is the final project for Coursera class "Practical Machine Learning" (predmachlearn-012.)
+
+### Set up environment
+
+Set up working environment by setting a random seed, setting the working directory, and loading the caret package.
+
+```{r}
+set.seed(123456)
+setwd("/work/mooc/coursera/predmachlearn-012")
+library(caret)
+```
+```{r, echo=FALSE}
+load(file = "final.RData")
+```
+
+### Load data sets
+
+Download and load the training and testing data sets. Use the na.string() feature of read.csv() to map all blanks and "divide by zero" warnings in the data to NA for feature evaluation.
+
+```{r, eval=FALSE}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "pml-training.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "pml-testing.csv")
+
+pml_train <- read.csv("pml-training.csv", na.strings=c(""," ","NA", "#DIV/0!"))
+pml_test <- read.csv("pml-testing.csv")
+
+View(pml_train)
+```
+
+### Remove unneeded features
+
+After viewing the training data, there appear to be a number of identification columns that will not be useful for modeling. Create a clean training data set with those columns removed.
+
+```{r, eval=FALSE}
+drop_colums = c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window")
+pml_train_clean <- pml_train[,!(names(pml_train) %in% drop_colums)]
+```
+
+### Eliminate features with any missing observations
+
+As a very simple data reduction step, identify and select only features in the clean training set that do not have any observations missing. Also, select only those features from the test set.
+
+```{r, eval=FALSE}
+pml_train_clean <- pml_train_clean[which(colMeans(is.na(pml_train_clean))==0)]
+pml_test_clean <- pml_test[,(names(pml_test) %in% names(pml_train_clean))]
+```
+
+
+### Train model
+
+Divide the training set into model training and model testing sets and train a random forest classifier. Use caret's built-in cross-validation feature to do 5-fold cross-validation during model construction.
+
+
+```{r, eval=FALSE}
+inTrain <- createDataPartition(y=pml_train_clean$classe, p=0.7, list=FALSE)
+training <- pml_train_clean[inTrain,]
+testing <- pml_train_clean[-inTrain,]
+
+rf_mod <- train(training$classe~., data=training, method="rf", trControl=trainControl(method="cv", number=5))
+print(rf_mod$finalModel)
+```
+
+The Out-of-bag estimate of the error rate for the model is 0.68%. 
+
+### Evaluate model
+
+Validate the accuracy of the model by fitting the the held-out testing data set.
+
+```{r, eval=FALSE}
+testing_fit <- predict(rf_mod, newdata=testing)
+```
+```{r}
+confusionMatrix(testing_fit, testing$classe)
+```
+
+The accuracy on the validation set is 99.3%.
+
+
+### Predict test cases
+
+Use the model to predict the test cases on the clean test set (with the unneeded columns removed.) Print out the solution vector to be sure it is in the correct format.
+
+```{r, eval=FALSE}
+test_case_fit <- predict(rf_mod, newdata=pml_test_clean)
+```
+```{r}
+test_case_fit
+```
+
+### Output results
+
+Write out the results for submission. The results of this model are 100% correct!
+
+```{r, eval=FALSE}
+pml_write_files = function(x){
+    n = length(x)
+    for(i in 1:n){
+        filename = paste0("final_results/problem_id_",i,".txt")
+        write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+}
+pml_write_files(test_case_fit)
+```
